@@ -15,6 +15,9 @@ from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
 import io
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -573,9 +576,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
             "💡 If you don't see a code, make sure your TV app is up to date."
         ),
         "cookie_editor_instruction": (
-            "🍪 **Before you can use this cookie**, you need to install the Cookie-Editor extension:\n\n"
-            "🔗 **Download it from:** <https://cookie-editor.com/>\n\n"
-            "After installing, import the cookie file using the extension."
+            "🍪 **Copy the cookie header below** and use it to authenticate.\n"
+            "You can add these cookies manually using a browser extension like **Cookie-Editor**.\n"
+            "🔗 **Download it from:** <https://cookie-editor.com/>"
         ),
     },
     "ar": {
@@ -629,15 +632,31 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
             "💡 إذا لم يظهر رمز، تأكد من تحديث تطبيق التلفاز."
         ),
         "cookie_editor_instruction": (
-            "🍪 **قبل استخدام هذا الكوكي**، يجب تثبيت إضافة Cookie-Editor:\n\n"
-            "🔗 **حمّلها من:** <https://cookie-editor.com/>\n\n"
-            "بعد التثبيت، قم باستيراد ملف الكوكي باستخدام الإضافة."
+            "🍪 **انسخ رأس الكوكي أدناه** واستخدمه للمصادقة.\n"
+            "يمكنك إضافة هذه الكوكيز يدويًا باستخدام إضافة متصفح مثل **Cookie-Editor**.\n"
+            "🔗 **حمّلها من:** <https://cookie-editor.com/>"
         ),
     }
 }
 
 def get_user_lang(interaction: discord.Interaction) -> str:
     return "ar" if str(interaction.locale).startswith("ar") else "en"
+
+# Helper to parse Netscape cookie file format and return Cookie header string
+def parse_netscape_to_cookie_header(content: str) -> str:
+    pairs = []
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        parts = line.split('\t')
+        if len(parts) >= 7:
+            # domain, flag, path, secure, expiration, name, value
+            name = parts[5].strip()
+            value = parts[6].strip()
+            if name and value:
+                pairs.append(f"{name}={value}")
+    return "; ".join(pairs)
 
 class ChannelLogConfig:
     def __init__(self, file_path: Path = GUILD_CONFIG_FILE):
@@ -1725,22 +1744,28 @@ async def _generate_and_send_cookie(
 
     if info:
         await interaction.edit_original_response(
-            content="✅ **Cookie generated successfully!** The cookie file and TV instructions are below (only visible to you).",
+            content="✅ **Cookie generated successfully!** The cookie header is below (only visible to you).",
             embed=None,
             view=None,
         )
 
         raw_cookie = info.get("raw_cookies", "")
         if raw_cookie:
-            file_data = io.BytesIO(raw_cookie.encode('utf-8'))
-            file = discord.File(file_data, filename="cookie.txt")
-            followup_msg = await interaction.followup.send(
-                "🍪 **Your Crunchyroll cookie file:**",
-                file=file,
-                ephemeral=True
-            )
-            messages_to_delete.append(followup_msg)
-            file_data.close()
+            cookie_header = parse_netscape_to_cookie_header(raw_cookie)
+            if cookie_header:
+                # Send the cookie header in a code block for easy copy
+                block = f"```text\nCookie:\n{cookie_header}\n```"
+                followup_msg = await interaction.followup.send(
+                    f"🍪 **Your Crunchyroll cookie header:**\n{block}",
+                    ephemeral=True
+                )
+                messages_to_delete.append(followup_msg)
+            else:
+                followup_msg = await interaction.followup.send(
+                    "⚠️ Cookie content could not be parsed.",
+                    ephemeral=True
+                )
+                messages_to_delete.append(followup_msg)
         else:
             followup_msg = await interaction.followup.send(
                 "⚠️ Cookie content not available.",
@@ -1748,12 +1773,14 @@ async def _generate_and_send_cookie(
             )
             messages_to_delete.append(followup_msg)
 
-        ce_msg = t.get("cookie_editor_instruction", 
-            "🍪 **Before using this cookie, install Cookie-Editor:** <https://cookie-editor.com/>")
+        ce_msg = t.get("cookie_editor_instruction",
+            "🍪 **Copy the cookie header below** and use it to authenticate.\n"
+            "You can add these cookies manually using a browser extension like Cookie-Editor.\n"
+            "🔗 **Download it from:** <https://cookie-editor.com/>")
         ce_followup = await interaction.followup.send(ce_msg, ephemeral=True)
         messages_to_delete.append(ce_followup)
 
-        tv_msg = t.get("tv_instruction", 
+        tv_msg = t.get("tv_instruction",
             "📺 Open **https://www.crunchyroll.com/activate** and enter the code displayed on your TV.")
         tv_followup = await interaction.followup.send(tv_msg, ephemeral=True)
         messages_to_delete.append(tv_followup)
