@@ -1748,7 +1748,6 @@ async def _generate_and_send_cookie(
                 pass
 
     if info:
-        # Edit the original response to indicate success
         try:
             await interaction.edit_original_response(
                 content="✅ **Cookie generated successfully!** The cookie header is below (only visible to you).",
@@ -1762,7 +1761,7 @@ async def _generate_and_send_cookie(
         if raw_cookie:
             cookie_header = parse_netscape_to_cookie_header(raw_cookie)
             if cookie_header:
-                block = f"```text\nCookie:\n{cookie_header}\n```"
+                block = f"```text\n{cookie_header}\n```"
                 try:
                     followup_msg = await interaction.followup.send(
                         f"🍪 **Your Crunchyroll cookie header:**\n{block}",
@@ -1797,7 +1796,6 @@ async def _generate_and_send_cookie(
             except Exception as e:
                 log.error(f"Failed to send missing content error: {e}")
 
-        # Send cookie editor instruction
         ce_msg = t.get("cookie_editor_instruction",
             "🍪 **Copy the cookie header below** and use it to authenticate.\n"
             "You can add these cookies manually using a browser extension like Cookie-Editor.\n"
@@ -1808,7 +1806,6 @@ async def _generate_and_send_cookie(
         except Exception as e:
             log.error(f"Failed to send cookie editor instruction: {e}")
 
-        # Send TV instruction
         tv_msg = t.get("tv_instruction",
             "📺 Open **https://www.crunchyroll.com/activate** and enter the code displayed on your TV.")
         try:
