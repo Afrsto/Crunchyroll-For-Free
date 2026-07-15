@@ -639,20 +639,28 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 def get_user_lang(interaction: discord.Interaction) -> str:
     return "ar" if str(interaction.locale).startswith("ar") else "en"
 
-# Helper to parse Netscape cookie file format and return Cookie header string
 def parse_netscape_to_cookie_header(content: str) -> str:
+    """Convert Netscape cookie file content to a Cookie header string."""
     pairs = []
     for line in content.splitlines():
         line = line.strip()
         if not line or line.startswith('#'):
             continue
         parts = line.split('\t')
+        # Netscape format: domain, flag, path, secure, expiration, name, value
         if len(parts) >= 7:
-            # domain, flag, path, secure, expiration, name, value
             name = parts[5].strip()
             value = parts[6].strip()
             if name and value:
                 pairs.append(f"{name}={value}")
+        else:
+            # Fallback: try to parse as key=value pairs separated by semicolons
+            for token in line.split(';'):
+                token = token.strip()
+                if '=' in token:
+                    k, v = token.split('=', 1)
+                    if k and v:
+                        pairs.append(f"{k.strip()}={v.strip()}")
     return "; ".join(pairs)
 
 class ChannelLogConfig:
@@ -1740,47 +1748,74 @@ async def _generate_and_send_cookie(
                 pass
 
     if info:
-        await interaction.edit_original_response(
-            content="✅ **Cookie generated successfully!** The cookie header is below (only visible to you).",
-            embed=None,
-            view=None,
-        )
+        # Edit the original response to indicate success
+        try:
+            await interaction.edit_original_response(
+                content="✅ **Cookie generated successfully!** The cookie header is below (only visible to you).",
+                embed=None,
+                view=None,
+            )
+        except Exception as e:
+            log.error(f"Failed to edit original response: {e}")
 
         raw_cookie = info.get("raw_cookies", "")
         if raw_cookie:
             cookie_header = parse_netscape_to_cookie_header(raw_cookie)
             if cookie_header:
-                # Send the cookie header in a code block for easy copy
                 block = f"```text\nCookie:\n{cookie_header}\n```"
-                followup_msg = await interaction.followup.send(
-                    f"🍪 **Your Crunchyroll cookie header:**\n{block}",
-                    ephemeral=True
-                )
-                messages_to_delete.append(followup_msg)
+                try:
+                    followup_msg = await interaction.followup.send(
+                        f"🍪 **Your Crunchyroll cookie header:**\n{block}",
+                        ephemeral=True
+                    )
+                    messages_to_delete.append(followup_msg)
+                except Exception as e:
+                    log.error(f"Failed to send cookie header: {e}")
+                    try:
+                        await interaction.followup.send(
+                            "⚠️ Could not send cookie header due to an error. Please try again.",
+                            ephemeral=True
+                        )
+                    except Exception:
+                        pass
             else:
+                try:
+                    followup_msg = await interaction.followup.send(
+                        "⚠️ Cookie content could not be parsed into a valid header.",
+                        ephemeral=True
+                    )
+                    messages_to_delete.append(followup_msg)
+                except Exception as e:
+                    log.error(f"Failed to send parse error: {e}")
+        else:
+            try:
                 followup_msg = await interaction.followup.send(
-                    "⚠️ Cookie content could not be parsed.",
+                    "⚠️ Cookie content not available.",
                     ephemeral=True
                 )
                 messages_to_delete.append(followup_msg)
-        else:
-            followup_msg = await interaction.followup.send(
-                "⚠️ Cookie content not available.",
-                ephemeral=True
-            )
-            messages_to_delete.append(followup_msg)
+            except Exception as e:
+                log.error(f"Failed to send missing content error: {e}")
 
+        # Send cookie editor instruction
         ce_msg = t.get("cookie_editor_instruction",
             "🍪 **Copy the cookie header below** and use it to authenticate.\n"
             "You can add these cookies manually using a browser extension like Cookie-Editor.\n"
             "🔗 **Download it from:** <https://cookie-editor.com/>")
-        ce_followup = await interaction.followup.send(ce_msg, ephemeral=True)
-        messages_to_delete.append(ce_followup)
+        try:
+            ce_followup = await interaction.followup.send(ce_msg, ephemeral=True)
+            messages_to_delete.append(ce_followup)
+        except Exception as e:
+            log.error(f"Failed to send cookie editor instruction: {e}")
 
+        # Send TV instruction
         tv_msg = t.get("tv_instruction",
             "📺 Open **https://www.crunchyroll.com/activate** and enter the code displayed on your TV.")
-        tv_followup = await interaction.followup.send(tv_msg, ephemeral=True)
-        messages_to_delete.append(tv_followup)
+        try:
+            tv_followup = await interaction.followup.send(tv_msg, ephemeral=True)
+            messages_to_delete.append(tv_followup)
+        except Exception as e:
+            log.error(f"Failed to send TV instruction: {e}")
 
         activity_timestamp = datetime.now(EGYPT_TZ).strftime("%Y-%m-%d %H:%M:%S")
         status_label = "✅ Success"
