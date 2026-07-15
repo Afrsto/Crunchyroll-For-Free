@@ -15,9 +15,6 @@ from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
 import io
 
-from dotenv import load_dotenv
-load_dotenv()
-
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -31,7 +28,7 @@ try:
 except ImportError:
     HAS_ASYNCPG = False
 
-from crunchyroll_checker import check_cookie_file, extract_cookies_dict
+from crunchyroll_checker import check_cookie_file
 
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_TOKEN", "").strip()
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
@@ -1728,34 +1725,38 @@ async def _generate_and_send_cookie(
 
     if info:
         await interaction.edit_original_response(
-            content="✅ **Cookie generated successfully!** The cookie is below (only visible to you).",
+            content="✅ **Cookie generated successfully!** The cookie file and TV instructions are below (only visible to you).",
             embed=None,
             view=None,
         )
 
         raw_cookie = info.get("raw_cookies", "")
         if raw_cookie:
-            # Convert Netscape format to semicolon-separated cookie string
-            cookies_dict = extract_cookies_dict(raw_cookie)
-            cookie_string = "; ".join(f"{k}={v}" for k, v in cookies_dict.items())
-            # Send the cookie as a code block for easy copying
-            await interaction.followup.send(
-                f"🍪 **Your Crunchyroll cookie:**\n```text\n{cookie_string}\n```",
+            file_data = io.BytesIO(raw_cookie.encode('utf-8'))
+            file = discord.File(file_data, filename="cookie.txt")
+            followup_msg = await interaction.followup.send(
+                "🍪 **Your Crunchyroll cookie file:**",
+                file=file,
                 ephemeral=True
             )
+            messages_to_delete.append(followup_msg)
+            file_data.close()
         else:
-            await interaction.followup.send(
+            followup_msg = await interaction.followup.send(
                 "⚠️ Cookie content not available.",
                 ephemeral=True
             )
+            messages_to_delete.append(followup_msg)
 
         ce_msg = t.get("cookie_editor_instruction", 
             "🍪 **Before using this cookie, install Cookie-Editor:** <https://cookie-editor.com/>")
-        await interaction.followup.send(ce_msg, ephemeral=True)
+        ce_followup = await interaction.followup.send(ce_msg, ephemeral=True)
+        messages_to_delete.append(ce_followup)
 
         tv_msg = t.get("tv_instruction", 
             "📺 Open **https://www.crunchyroll.com/activate** and enter the code displayed on your TV.")
-        await interaction.followup.send(tv_msg, ephemeral=True)
+        tv_followup = await interaction.followup.send(tv_msg, ephemeral=True)
+        messages_to_delete.append(tv_followup)
 
         activity_timestamp = datetime.now(EGYPT_TZ).strftime("%Y-%m-%d %H:%M:%S")
         status_label = "✅ Success"
