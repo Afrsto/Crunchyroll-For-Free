@@ -1761,22 +1761,46 @@ async def _generate_and_send_cookie(
         if raw_cookie:
             cookie_header = parse_netscape_to_cookie_header(raw_cookie)
             if cookie_header:
-                block = f"```text\n{cookie_header}\n```"
-                try:
-                    followup_msg = await interaction.followup.send(
-                        f"🍪 **Your Crunchyroll cookie header:**\n{block}",
-                        ephemeral=True
-                    )
-                    messages_to_delete.append(followup_msg)
-                except Exception as e:
-                    log.error(f"Failed to send cookie header: {e}")
+                # Calculate safe length for a single message (leaving room for the code block and prefix)
+                MAX_LEN = 1900
+                if len(cookie_header) <= MAX_LEN:
+                    block = f"```text\n{cookie_header}\n```"
                     try:
-                        await interaction.followup.send(
-                            "⚠️ Could not send cookie header due to an error. Please try again.",
+                        followup_msg = await interaction.followup.send(
+                            f"🍪 **Your Crunchyroll cookie header:**\n{block}",
                             ephemeral=True
                         )
-                    except Exception:
-                        pass
+                        messages_to_delete.append(followup_msg)
+                    except Exception as e:
+                        log.error(f"Failed to send cookie header: {e}")
+                        try:
+                            await interaction.followup.send(
+                                "⚠️ Could not send cookie header due to an error. Please try again.",
+                                ephemeral=True
+                            )
+                        except Exception:
+                            pass
+                else:
+                    # Split into multiple parts
+                    parts = [cookie_header[i:i+MAX_LEN] for i in range(0, len(cookie_header), MAX_LEN)]
+                    for idx, part in enumerate(parts, 1):
+                        part_block = f"```text\n{part}\n```"
+                        try:
+                            followup_msg = await interaction.followup.send(
+                                f"🍪 **Cookie header part {idx}/{len(parts)}:**\n{part_block}",
+                                ephemeral=True
+                            )
+                            messages_to_delete.append(followup_msg)
+                        except Exception as e:
+                            log.error(f"Failed to send cookie header part {idx}: {e}")
+                            try:
+                                await interaction.followup.send(
+                                    f"⚠️ Could not send part {idx} of the cookie header. Please try again.",
+                                    ephemeral=True
+                                )
+                            except Exception:
+                                pass
+                            break
             else:
                 try:
                     followup_msg = await interaction.followup.send(
