@@ -1439,7 +1439,7 @@ class CookieCheckModal(discord.ui.Modal, title="⚙️ Check Cookie → Info"):
         style=discord.TextStyle.paragraph,
         placeholder="etp_rt=...; session_id=...; device_id=...; OptanonConsent=...",
         required=True,
-        max_length=5000,
+        max_length=4000,
     )
 
     def __init__(self, original_interaction: discord.Interaction) -> None:
@@ -1531,13 +1531,11 @@ class CookieCheckModal(discord.ui.Modal, title="⚙️ Check Cookie → Info"):
             "✉️ Email": info.get("email", "N/A"),
             "🌍 Country": info.get("country", "N/A"),
             "🎁 Plan": info.get("plan", "N/A"),
-            "📺 Max Streams": info.get("max_streams", "N/A"),
             "📅 Member Since": info.get("member_since", "N/A"),
             "🔄 Next Billing": info.get("next_billing", "N/A"),
-            "⏸️ Days Left": info.get("days_left", "N/A"),
+            "⏸️ Days Left": str(info.get("days_left", "N/A")),
             "💳 Payment": info.get("payment_method", "N/A"),
             "🎫 Membership": info.get("membership_status", "N/A"),
-            "✔️ Verified": "Yes" if info.get("verified") else "No",
         }
         for name, value in field_map.items():
             if value and value != "N/A":
@@ -1550,9 +1548,9 @@ class CookieCheckModal(discord.ui.Modal, title="⚙️ Check Cookie → Info"):
         if cookie_header:
             chunks = _build_cookie_header_chunks(cookie_header)
             for idx, chunk in enumerate(chunks, 1):
-                prefix = "🍪 **Your Crunchyroll cookie header:**"
+                prefix = "Your Crunchyroll cookie header:"
                 if len(chunks) > 1:
-                    prefix = f"🍪 **Cookie header part {idx}/{len(chunks)}:**"
+                    prefix = f"Your Crunchyroll cookie header (part {idx}/{len(chunks)}):"
                 await interaction.followup.send(f"{prefix}\n{chunk}", ephemeral=True)
 
         ce_msg = TRANSLATIONS["en"]["cookie_editor_instruction"]
@@ -2213,15 +2211,15 @@ async def _send_success_cookie_response(
         timestamp=datetime.now(EGYPT_TZ),
     )
     embed.set_thumbnail(url=CRUNCHYROLL_LOGO)
+
     field_map = {
         "👤 Name": info.get("name", "N/A"),
         "✉️ Email": info.get("email", "N/A"),
         "🌍 Country": info.get("country", "N/A"),
         "🎁 Plan": info.get("plan", "N/A"),
-        "📺 Max Streams": info.get("max_streams", "N/A"),
         "📅 Member Since": info.get("member_since", "N/A"),
         "🔄 Next Billing": info.get("next_billing", "N/A"),
-        "⏸️ Days Left": info.get("days_left", "N/A"),
+        "⏸️ Days Left": str(info.get("days_left", "N/A")),
         "💳 Payment": info.get("payment_method", "N/A"),
         "🎫 Membership": info.get("membership_status", "N/A"),
     }
@@ -2247,9 +2245,9 @@ async def _send_success_cookie_response(
     if cookie_header:
         chunks = _build_cookie_header_chunks(cookie_header)
         for idx, chunk in enumerate(chunks, 1):
-            prefix = "🍪 **Your Crunchyroll cookie header:**"
+            prefix = "Your Crunchyroll cookie header:"
             if len(chunks) > 1:
-                prefix = f"🍪 **Cookie header part {idx}/{len(chunks)}:**"
+                prefix = f"Your Crunchyroll cookie header (part {idx}/{len(chunks)}):"
             try:
                 msg = await interaction.followup.send(f"{prefix}\n{chunk}", ephemeral=True)
                 extra_messages.append(msg)
@@ -2289,6 +2287,18 @@ async def _send_success_cookie_response(
         timestamp=activity_timestamp,
     ))
 
+    asyncio.create_task(send_user_activity_to_log_channel(
+        interaction,
+        info,
+        plan_key,
+        device,
+        "✅ Success",
+        "Cookie generated",
+        used_files,
+        lang,
+        activity_timestamp,
+    ))
+
     if interaction.guild:
         asyncio.create_task(_refresh_stats_message(interaction.guild.id))
 
@@ -2299,6 +2309,82 @@ async def _send_success_cookie_response(
         lang_message=lang_message,
         confirm_message=confirm_message,
     ))
+
+
+async def send_user_activity_to_log_channel(
+    interaction: discord.Interaction,
+    info: Dict[str, Any],
+    plan_key: str,
+    device: str,
+    status: str,
+    result: str,
+    used_files: List[str],
+    language: str,
+    timestamp: str,
+) -> None:
+    guild = interaction.guild
+    if not guild:
+        return
+
+    channel_id = channel_log_config.get_channel_id(guild.id)
+    if not channel_id:
+        return
+
+    channel = interaction.client.get_channel(channel_id)
+    if not channel:
+        return
+
+    member = interaction.user
+    embed = discord.Embed(
+        title="🍣 User Activity Log",
+        color=CRUNCHYROLL_ORANGE,
+        timestamp=datetime.now(EGYPT_TZ),
+    )
+    avatar_url = member.display_avatar.url if member.display_avatar else CRUNCHYROLL_LOGO
+    embed.set_thumbnail(url=avatar_url)
+
+    lang_label = {"en": "English 🇬🇧", "ar": "Arabic 🇸🇦"}.get(language, language)
+    device_display = {"pc": "PC 🖥️", "phone": "Phone 📱", "tv": "TV 📺", "all": "All Devices 🖥️📱📺"}.get(device, device.capitalize())
+    channel_mention = interaction.channel.mention if interaction.channel else "N/A"
+
+    plan = info.get("plan", "N/A")
+    days_left = info.get("days_left", "N/A")
+
+    fields = [
+        ("👤 User", f"{member.mention} ({member.display_name})", True),
+        ("🆔 ID", str(member.id), True),
+        ("📌 Date of Use", timestamp, True),
+        ("🎁 Plan", plan, True),
+        ("⏸️ Days Left", str(days_left), True),
+        ("💻 Device", device_display, True),
+        ("🏠 Server", guild.name, True),
+        ("💬 Channel", channel_mention, True),
+        ("🔎 Result", result, True),
+        ("🌐 Language", lang_label, True),
+        ("📄 Files Used", ", ".join(used_files) if used_files else "N/A", True),
+        ("📊 Status", status, True),
+    ]
+
+    for name, value, inline in fields:
+        embed.add_field(name=name, value=value, inline=inline)
+
+    embed.set_footer(text="X2 Salah Utility • Crunchyroll Bot 🍣")
+
+    try:
+        await channel.send(embed=embed)
+        log.info(f"Sent user activity for {member} to log channel {channel.id}")
+
+        cfg = channel_log_config.get_guild_config(guild.id)
+        if timestamp:
+            current_ts = cfg.get("last_timestamp")
+            if current_ts is None or timestamp > current_ts:
+                channel_log_config.set_guild_config(guild.id, {
+                    "channel_id": channel_id,
+                    "sync_done": cfg.get("sync_done", False),
+                    "last_timestamp": timestamp,
+                })
+    except Exception as e:
+        log.error(f"Failed to send user activity to log channel: {e}")
 
 
 async def _wait_for_check_all_idle(interaction: discord.Interaction, language: str) -> None:
