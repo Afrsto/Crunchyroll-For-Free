@@ -34,7 +34,7 @@ from crunchyroll_checker import (
     quick_check_cookie_content,
 )
 
-BOT_VERSION = "v1.0.0"
+BOT_VERSION = "v1.0.1"
 CRUNCHYROLL_BANNER_GIF = "https://cdn.discordapp.com/attachments/1515490244353458227/1553918478677966998/CRLogos-high.gif"
 CRUNCHYROLL_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Crunchyroll_Logo.png/320px-Crunchyroll_Logo.png"
 GET_KEY_URL = "https://linkjust.com/"
@@ -60,7 +60,9 @@ CHECK_ALL_SCHEDULE_FILE = Path("cr_check_all_schedule.json")
 SCRIPT_TIMEOUT = 60
 QUICK_CHECK_TIMEOUT = 20
 CREATE_COOKIE_BUDGET_SECONDS = 300
-CLEANUP_DELAY_SECONDS = 60
+
+CLEANUP_DELAY_SECONDS = 1800
+
 COOLDOWN_HOURS = 24
 
 CHECK_ALL_HOUR = 3
@@ -568,7 +570,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "phone_label": "Phone",
         "tv_label": "TV",
         "progress": "⏳ **Generating your Crunchyroll cookie… please wait.**",
-        "retry_status": "⏳ Still generating your cookie… trying again (attempt {attempt}).",
+        "retry_status": "⏳ **Generating your Crunchyroll cookie… please wait.**",
         "wait_stock_check": "⏳ Stock check is running… please wait. Your cookie will generate when it finishes.",
         "no_cookies_folder": "❌ Cookies folder not found. Please contact the administrator.",
         "no_cookie_files": "❌ No accounts available right now. Please try again later.",
@@ -616,7 +618,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "phone_label": "Phone",
         "tv_label": "TV",
         "progress": "\u200f⏳ **جاري إنشاء الكوكي الخاص بك… يرجى الانتظار.**",
-        "retry_status": "\u200f⏳ ما زلنا ننشئ الكوكي… إعادة المحاولة (محاولة {attempt}).",
+        "retry_status": "\u200f⏳ **جاري إنشاء الكوكي الخاص بك… يرجى الانتظار.**",
         "wait_stock_check": "\u200f⏳ جاري فحص المخزون… يرجى الانتظار. سيتم إنشاء الكوكي بعد انتهائه.",
         "no_cookies_folder": "\u200f❌ مجلد الكوكيز غير موجود. يرجى الاتصال بالمسؤول.",
         "no_cookie_files": "\u200f❌ لا توجد حسابات متاحة حالياً. حاول لاحقاً.",
@@ -2212,6 +2214,10 @@ async def _send_success_cookie_response(
     )
     embed.set_thumbnail(url=CRUNCHYROLL_LOGO)
 
+    days_left_value = info.get("days_left", "N/A")
+    if days_left_value is None:
+        days_left_value = "N/A"
+
     field_map = {
         "👤 Name": info.get("name", "N/A"),
         "✉️ Email": info.get("email", "N/A"),
@@ -2219,7 +2225,7 @@ async def _send_success_cookie_response(
         "🎁 Plan": info.get("plan", "N/A"),
         "📅 Member Since": info.get("member_since", "N/A"),
         "🔄 Next Billing": info.get("next_billing", "N/A"),
-        "⏸️ Days Left": str(info.get("days_left", "N/A")),
+        "⏸️ Days Left": str(days_left_value),
         "💳 Payment": info.get("payment_method", "N/A"),
         "🎫 Membership": info.get("membership_status", "N/A"),
     }
@@ -2283,7 +2289,7 @@ async def _send_success_cookie_response(
         interaction, "✅ Success", "Cookie generated",
         used_txt_files=used_files, language=lang, plan_key=plan_key, device=device,
         plan=info.get("plan", "N/A"),
-        days_left=info.get("days_left", "N/A"),
+        days_left=str(days_left_value),
         timestamp=activity_timestamp,
     ))
 
@@ -2349,6 +2355,8 @@ async def send_user_activity_to_log_channel(
 
     plan = info.get("plan", "N/A")
     days_left = info.get("days_left", "N/A")
+    if days_left is None:
+        days_left = "N/A"
 
     fields = [
         ("👤 User", f"{member.mention} ({member.display_name})", True),
@@ -2397,11 +2405,11 @@ async def _wait_for_check_all_idle(interaction: discord.Interaction, language: s
     except Exception:
         pass
     while lock.locked():
-        await asyncio.sleep(1)
-        try:
-            await interaction.edit_original_response(content=t["wait_stock_check"], embed=None, view=None)
-        except Exception:
-            pass
+        await asyncio.sleep(2)
+    try:
+        await interaction.edit_original_response(content=t["progress"], embed=None, view=None)
+    except Exception:
+        pass
 
 
 async def _generate_and_send_cookie(
@@ -2419,6 +2427,11 @@ async def _generate_and_send_cookie(
 
     await _wait_for_check_all_idle(interaction, lang)
 
+    try:
+        await interaction.edit_original_response(content=t["progress"], embed=None, view=None)
+    except Exception:
+        pass
+
     exclude_names: Set[str] = set()
     soft_timeout_counts: Dict[str, int] = {}
     retry_same_name: Optional[str] = None
@@ -2430,11 +2443,6 @@ async def _generate_and_send_cookie(
 
     while time.monotonic() < deadline:
         attempt += 1
-        status_msg = t["progress"] if attempt == 1 else t["retry_status"].format(attempt=attempt)
-        try:
-            await interaction.edit_original_response(content=status_msg, embed=None, view=None)
-        except Exception:
-            pass
 
         await _wait_for_check_all_idle(interaction, lang)
 
@@ -3075,6 +3083,7 @@ async def on_ready() -> None:
     log.info(f"Logged in as : {bot.user}  (ID: {bot.user.id})")
     log.info(f"Bot version  : {BOT_VERSION}")
     log.info(f"Cookie check limit : {COOKIE_CHECK_LIMIT} per {COOKIE_CHECK_WINDOW_HOURS}h (non-admins)")
+    log.info(f"Cleanup delay      : {CLEANUP_DELAY_SECONDS}s ({CLEANUP_DELAY_SECONDS // 60} min)")
     if ALLOWED_GUILD_IDS:
         log.info(f"Guild restriction : {ALLOWED_GUILD_IDS}")
     else:
