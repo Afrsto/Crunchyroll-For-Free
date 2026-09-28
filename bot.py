@@ -34,10 +34,12 @@ from crunchyroll_checker import (
     quick_check_cookie_content,
 )
 
-BOT_VERSION = "v1.0.1"
+BOT_VERSION = "v1.0.2"
 CRUNCHYROLL_BANNER_GIF = "https://cdn.discordapp.com/attachments/1515490244353458227/1553918478677966998/CRLogos-high.gif"
 CRUNCHYROLL_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Crunchyroll_Logo.png/320px-Crunchyroll_Logo.png"
 GET_KEY_URL = "https://linkjust.com/"
+
+TUTORIAL_VIDEO_URL = "https://cdn.discordapp.com/attachments/1509511707234533517/1543327289050144903/Record_2026_08_29_21_9.mp4"
 
 DISCORD_USER_URL = "https://discord.com/users/994817247061225633"
 DISCORD_SERVER_URL = "https://discord.gg/btRCeujadA"
@@ -601,6 +603,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
             "You can add these cookies manually using a browser extension like **Cookie-Editor**.\n"
             "🔗 **Download it from:** <https://cookie-editor.com/>"
         ),
+        "tutorial_title": "🎥 Tutorial Video",
+        "tutorial_desc": "Watch this short video to see exactly how to import your cookie:",
         "tv_instruction": (
             "📺 **TV Activation Instructions**\n\n"
             "1️⃣  Open **https://www.crunchyroll.com/activate** on your browser.\n"
@@ -649,6 +653,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
             "يمكنك إضافة هذه الكوكيز يدويًا باستخدام إضافة متصفح مثل **Cookie-Editor**.\n"
             "🔗 **حمّلها من:** <https://cookie-editor.com/>"
         ),
+        "tutorial_title": "🎥 فيديو تعليمي",
+        "tutorial_desc": "شاهد هذا الفيديو القصير لمعرفة كيفية استيراد الكوكي خطوة بخطوة:",
         "tv_instruction": (
             "\u200f📺 **تعليمات تفعيل التلفاز**\n\n"
             "1️⃣  افتح **https://www.crunchyroll.com/activate** في متصفحك.\n"
@@ -686,6 +692,31 @@ def parse_netscape_to_cookie_header(content: str) -> str:
                     if k and v:
                         pairs.append(f"{k.strip()}={v.strip()}")
     return "; ".join(pairs)
+
+
+async def _send_tutorial_video_message(
+    interaction: discord.Interaction,
+    language: str,
+) -> Optional[discord.Message]:
+    t = TRANSLATIONS.get(language) or TRANSLATIONS["en"]
+    try:
+        embed = discord.Embed(
+            title=t["tutorial_title"],
+            description=(
+                f"{t['tutorial_desc']}\n\n"
+                f"▶️ **Watch here:** [Click to play the video]({TUTORIAL_VIDEO_URL})\n\n"
+                f"{TUTORIAL_VIDEO_URL}"
+            ),
+            color=CRUNCHYROLL_ORANGE,
+            timestamp=datetime.now(EGYPT_TZ),
+        )
+        embed.set_footer(text="X2 Salah Utility • Crunchyroll Bot 🍣")
+        msg = await interaction.followup.send(embed=embed, ephemeral=True)
+        log.info("Sent tutorial video message.")
+        return msg
+    except Exception as e:
+        log.error(f"Failed to send tutorial video message: {e}")
+        return None
 
 
 class ChannelLogConfig:
@@ -1558,6 +1589,8 @@ class CookieCheckModal(discord.ui.Modal, title="⚙️ Check Cookie → Info"):
         ce_msg = TRANSLATIONS["en"]["cookie_editor_instruction"]
         await interaction.followup.send(ce_msg, ephemeral=True)
 
+        await _send_tutorial_video_message(interaction, "en")
+
         asyncio.create_task(_log_cookie_check_to_channel(
             self.original_interaction,
             status="✅ Success",
@@ -2274,6 +2307,10 @@ async def _send_success_cookie_response(
         extra_messages.append(msg)
     except Exception as e:
         log.error(f"Failed to send cookie-editor instruction: {e}")
+
+    tutorial_msg = await _send_tutorial_video_message(interaction, lang)
+    if tutorial_msg is not None:
+        extra_messages.append(tutorial_msg)
 
     if device == "tv":
         try:
@@ -3084,6 +3121,7 @@ async def on_ready() -> None:
     log.info(f"Bot version  : {BOT_VERSION}")
     log.info(f"Cookie check limit : {COOKIE_CHECK_LIMIT} per {COOKIE_CHECK_WINDOW_HOURS}h (non-admins)")
     log.info(f"Cleanup delay      : {CLEANUP_DELAY_SECONDS}s ({CLEANUP_DELAY_SECONDS // 60} min)")
+    log.info(f"Tutorial video URL : {TUTORIAL_VIDEO_URL}")
     if ALLOWED_GUILD_IDS:
         log.info(f"Guild restriction : {ALLOWED_GUILD_IDS}")
     else:
