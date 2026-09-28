@@ -39,7 +39,7 @@ CRUNCHYROLL_BANNER_GIF = "https://cdn.discordapp.com/attachments/151549024435345
 CRUNCHYROLL_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Crunchyroll_Logo.png/320px-Crunchyroll_Logo.png"
 GET_KEY_URL = "https://linkjust.com/"
 
-TUTORIAL_VIDEO_URL = "https://pixeldrain.com/u/3Z8K1ucY"
+TUTORIAL_VIDEO_URL = "https://mega.nz/file/KvAAlK4I#MfwbiMpcPe40lgTeMqiD7PeImFeU3k8p6PpapOvzMR8"
 
 DISCORD_USER_URL = "https://discord.com/users/994817247061225633"
 DISCORD_SERVER_URL = "https://discord.gg/btRCeujadA"
@@ -63,7 +63,7 @@ SCRIPT_TIMEOUT = 60
 QUICK_CHECK_TIMEOUT = 20
 CREATE_COOKIE_BUDGET_SECONDS = 300
 
-CLEANUP_DELAY_SECONDS = 1800
+CLEANUP_DELAY_SECONDS = 600
 
 COOLDOWN_HOURS = 24
 
