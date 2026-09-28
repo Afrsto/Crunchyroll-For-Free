@@ -292,33 +292,6 @@ def get_subscription_details(token: str, account_id: str, cookies_dict: dict) ->
         return None
 
 
-def get_product_details(token: str, account_id: str, cookies_dict: dict) -> Optional[Dict]:
-    session = requests.Session()
-    for name, value in cookies_dict.items():
-        session.cookies.set(name, value, domain=".crunchyroll.com", path="/")
-        session.cookies.set(name, value, domain="www.crunchyroll.com", path="/")
-
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Authorization": f"Bearer {token}",
-        "Etp-Anonymous-Id": ETP_ANONYMOUS_ID,
-        "Referer": "https://www.crunchyroll.com/account/membership",
-    }
-    try:
-        resp = session.get(
-            f"https://www.crunchyroll.com/subs/v1/subscriptions/{account_id}/products",
-            headers=headers, timeout=15,
-        )
-        if resp.status_code == 200:
-            items = resp.json().get("items", [])
-            if items:
-                product = items[0].get("product", {})
-                return {"max_streams": product.get("max_streams")}
-    except Exception:
-        pass
-    return None
-
-
 def extract_info(cookies_dict: dict) -> Dict[str, Any]:
     token = get_access_token_from_cookies(cookies_dict)
     if not token:
@@ -330,7 +303,6 @@ def extract_info(cookies_dict: dict) -> Dict[str, Any]:
 
     account_id = account_info["account_id"]
     sub_info = get_subscription_details(token, account_id, cookies_dict) or {}
-    product_info = get_product_details(token, account_id, cookies_dict) or {}
 
     plan_code = str(sub_info.get("plan_code", "")).lower()
     plan_label = sub_info.get("plan_label", "Unknown")
@@ -352,7 +324,6 @@ def extract_info(cookies_dict: dict) -> Dict[str, Any]:
         "country": get_country_name(sub_info.get("country", "Unknown")),
         "plan": plan_display,
         "plan_code": plan_code,
-        "max_streams": product_info.get("max_streams") or "N/A",
         "member_since": format_member_since(account_info.get("created")),
         "next_billing": format_display_date(sub_info.get("expiration_date")),
         "days_left": sub_info.get("days_left") if sub_info.get("days_left") is not None else "N/A",
