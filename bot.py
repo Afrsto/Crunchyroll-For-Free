@@ -35,7 +35,7 @@ from crunchyroll_checker import (
 )
 
 BOT_VERSION = "v1.0.2"
-CRUNCHYROLL_BANNER_GIF = "https://cdn.discordapp.com/attachments/1515490244353458227/1553918478677966998/CRLogos-high.gif"
+CRUNCHYROLL_BANNER_GIF = "https://cdn.discordapp.com/attachments/1515490244353458227/1553971390741217373/CrunchyrollOriginalsIdentity-high.gif"
 CRUNCHYROLL_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Crunchyroll_Logo.png/320px-Crunchyroll_Logo.png"
 GET_KEY_URL = "https://linkjust.com/"
 
