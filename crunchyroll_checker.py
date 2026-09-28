@@ -107,11 +107,42 @@ def format_member_since(value) -> str:
 def compute_days_left(expiry_date_str: Optional[str]) -> Optional[int]:
     if not expiry_date_str:
         return None
+
+    expiry_str = str(expiry_date_str).strip()
+    if not expiry_str:
+        return None
+
+    now = datetime.now(pytz.UTC)
+
     try:
-        dt = datetime.fromisoformat(str(expiry_date_str).replace("Z", "+00:00"))
-        now = datetime.now(pytz.UTC)
-        delta = dt - now
-        return max(0, delta.days)
+        renewal_date = datetime.strptime(
+            expiry_str.replace("Z", "+00:00"),
+            "%Y-%m-%dT%H:%M:%S%z",
+        )
+        return max(0, (renewal_date - now).days)
+    except Exception:
+        pass
+
+    try:
+        renewal_date = datetime.strptime(
+            expiry_str.replace("Z", "+00:00"),
+            "%Y-%m-%dT%H:%M:%S.%f%z",
+        )
+        return max(0, (renewal_date - now).days)
+    except Exception:
+        pass
+
+    try:
+        dt = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=pytz.UTC)
+        return max(0, (dt - now).days)
+    except Exception:
+        pass
+
+    try:
+        dt = datetime.strptime(expiry_str[:10], "%Y-%m-%d").replace(tzinfo=pytz.UTC)
+        return max(0, (dt - now).days)
     except Exception:
         return None
 
@@ -227,6 +258,22 @@ def get_account_info_from_token(token: str, cookies_dict: dict) -> Optional[Dict
     return None
 
 
+def _extract_expiry_from_sub(sub: Dict[str, Any]) -> Optional[str]:
+    candidates = (
+        "nextRenewalDate",
+        "next_renewal_date",
+        "expirationDate",
+        "expiration_date",
+        "renewalDate",
+        "renewal_date",
+    )
+    for key in candidates:
+        value = sub.get(key)
+        if value:
+            return value
+    return None
+
+
 def get_subscription_details(token: str, account_id: str, cookies_dict: dict) -> Optional[Dict]:
     session = requests.Session()
     for name, value in cookies_dict.items():
@@ -274,7 +321,7 @@ def get_subscription_details(token: str, account_id: str, cookies_dict: dict) ->
                 "days_left": None,
             }
 
-        expiry = sub.get("nextRenewalDate")
+        expiry = _extract_expiry_from_sub(sub)
         return {
             "is_free": False,
             "country": sub.get("countryCode", "Unknown"),
@@ -318,6 +365,15 @@ def extract_info(cookies_dict: dict) -> Dict[str, Any]:
     is_free = sub_info.get("is_free", False)
     membership_status = "Free" if is_free else "Premium"
 
+    raw_days = sub_info.get("days_left")
+    if raw_days is None:
+        days_left_display: Any = "N/A"
+    else:
+        try:
+            days_left_display = int(raw_days)
+        except (TypeError, ValueError):
+            days_left_display = raw_days
+
     return {
         "name": account_info.get("username") or "Unknown",
         "email": account_info.get("email") or "Unknown",
@@ -326,7 +382,7 @@ def extract_info(cookies_dict: dict) -> Dict[str, Any]:
         "plan_code": plan_code,
         "member_since": format_member_since(account_info.get("created")),
         "next_billing": format_display_date(sub_info.get("expiration_date")),
-        "days_left": sub_info.get("days_left") if sub_info.get("days_left") is not None else "N/A",
+        "days_left": days_left_display,
         "phone": "N/A",
         "membership_status": membership_status,
         "profiles": "N/A",
