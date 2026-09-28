@@ -39,7 +39,7 @@ CRUNCHYROLL_BANNER_GIF = "https://cdn.discordapp.com/attachments/151549024435345
 CRUNCHYROLL_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Crunchyroll_Logo.png/320px-Crunchyroll_Logo.png"
 GET_KEY_URL = "https://linkjust.com/"
 
-TUTORIAL_VIDEO_URL = "https://cdn.discordapp.com/attachments/1509511707234533517/1543327289050144903/Record_2026_08_29_21_9.mp4"
+TUTORIAL_VIDEO_URL = "https://pixeldrain.com/u/3Z8K1ucY"
 
 DISCORD_USER_URL = "https://discord.com/users/994817247061225633"
 DISCORD_SERVER_URL = "https://discord.gg/btRCeujadA"
