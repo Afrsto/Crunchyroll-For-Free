@@ -1379,11 +1379,15 @@ async def _build_main_embed() -> discord.Embed:
         asyncio.to_thread(_count_txt_files_in_folder, "Ultimate Fan"),
     )
     total = fan_c + mega_c + ult_c
+
+    # ── Each plan tier is now on its own line with a blank line between sections ──
     description = (
         f"🍪 **Alive cookies** — `{total}`\n"
-        f"🎈 **Fan:** `{fan_c}`   "
-        f"💎 **Mega Fan:** `{mega_c}`   "
+        f"\n"
+        f"🎈 **Fan:** `{fan_c}`\n"
+        f"💎 **Mega Fan:** `{mega_c}`\n"
         f"🚀 **Ultimate Fan:** `{ult_c}`\n"
+        f"\n"
         f"🏷️ **Version:** `{BOT_VERSION}`    •    🟢 **Status:** Online\n"
         f"\n"
         f"**Discord**\n"
